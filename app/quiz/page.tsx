@@ -38,6 +38,7 @@ export default function QuizPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          topicId: cfg.topicId,
           topic: cfg.topicName,
           difficulty: cfg.difficulty,
           count: cfg.questionCount,

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getHistory } from '@/lib/storage';
 import { HistoryEntry } from '@/types';
-import { TOPIC_CATEGORIES } from '@/lib/topics';
 
 function scoreColor(s: number) {
   if (s >= 0.8) return 'text-green-600';
@@ -32,6 +31,14 @@ function formatDate(iso: string) {
   });
 }
 
+interface TopicStat {
+  id: string;
+  name: string;
+  entries: HistoryEntry[];
+  avgScore: number;
+  bestScore: number;
+}
+
 export default function HistoryPage() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
@@ -39,24 +46,23 @@ export default function HistoryPage() {
     setHistory(getHistory());
   }, []);
 
-  const allTopics = TOPIC_CATEGORIES.flatMap(cat => cat.topics);
+  // Build per-topic stats from history entries directly (no hardcoded topics needed)
+  const topicMap = new Map<string, HistoryEntry[]>();
+  for (const entry of history) {
+    const group = topicMap.get(entry.topicId) ?? [];
+    group.push(entry);
+    topicMap.set(entry.topicId, group);
+  }
 
-  const topicStats = allTopics
-    .map(topic => {
-      const entries = history.filter(h => h.topicId === topic.id);
-      if (entries.length === 0) return null;
-      const avgScore = entries.reduce((s, e) => s + e.score, 0) / entries.length;
-      const bestScore = Math.max(...entries.map(e => e.score));
-      return { id: topic.id, name: topic.name, entries, avgScore, bestScore };
-    })
-    .filter(Boolean)
-    .sort((a, b) => a!.avgScore - b!.avgScore) as {
-      id: string;
-      name: string;
-      entries: HistoryEntry[];
-      avgScore: number;
-      bestScore: number;
-    }[];
+  const topicStats: TopicStat[] = Array.from(topicMap.entries())
+    .map(([topicId, entries]) => ({
+      id: topicId,
+      name: entries[0].topic,
+      entries,
+      avgScore: entries.reduce((s, e) => s + e.score, 0) / entries.length,
+      bestScore: Math.max(...entries.map(e => e.score)),
+    }))
+    .sort((a, b) => a.avgScore - b.avgScore);
 
   if (history.length === 0) {
     return (

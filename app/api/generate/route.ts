@@ -1,57 +1,73 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
+import { getSourcesContent } from '@/lib/db';
 
 const client = new Anthropic();
 
-const SYSTEM_PROMPT = `You are an expert educator and quiz designer. Your job is to create challenging, intellectually stimulating quiz questions that test deep conceptual understanding—not surface-level memorization.
+const BASE_SYSTEM = `You are an expert educator and quiz designer creating questions that test deep conceptual understanding — not surface-level memorization.
 
 Guidelines:
 - Mix multiple-choice (MCQ) and short-answer questions
-- MCQ questions must have 4 options with plausible distractors that require genuine reasoning to eliminate
-- Short-answer questions must be open-ended, probing edge cases, misconceptions, and connections between concepts
-- Questions should be creative and test genuine comprehension, not just recitation of definitions
-- Include a detailed rubric for short-answer questions describing what a complete, correct answer must contain
-
-Difficulty calibration:
-- easy: foundational concepts, standard definitions, basic application
-- medium: application, analysis, comparing related concepts, identifying trade-offs
-- hard: synthesis, edge cases, subtle distinctions, "why does X fail when Y" style questions
+- MCQ must have 4 options with plausible distractors requiring genuine reasoning
+- Short-answer questions must be open-ended, probing edge cases, misconceptions, and cross-concept connections
+- Scale difficulty: easy = foundational concepts; medium = application and analysis; hard = synthesis, edge cases, subtle distinctions
 
 Return ONLY valid JSON — no markdown, no explanation, no code blocks.`;
 
+const SOURCE_ADDENDUM = `
+IMPORTANT: You have been given source material below. Generate questions EXCLUSIVELY from concepts, facts, and ideas present in that material. Do not ask about topics not covered in the sources. Ground every question in something the learner could have studied from these sources.`;
+
+const NO_SOURCE_ADDENDUM = `
+Generate questions from your general knowledge of this topic.`;
+
 export async function POST(req: NextRequest) {
   try {
-    const { topic, difficulty, count } = await req.json();
+    const { topicId, topic, difficulty, count } = await req.json();
 
     if (!topic || !difficulty || !count) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    const sourceContent = topicId ? getSourcesContent(topicId) : '';
+    const hasSource = sourceContent.trim().length > 0;
+
+    // Limit context to ~120k chars (~30k tokens) to leave room for the response
+    const contextText = hasSource ? sourceContent.slice(0, 120_000) : '';
+
     const mcqCount = Math.round(count * 0.4);
     const saCount = count - mcqCount;
 
-    const userPrompt = `Create ${count} quiz questions about "${topic}" at ${difficulty} difficulty.
+    const systemPrompt =
+      BASE_SYSTEM + (hasSource ? SOURCE_ADDENDUM : NO_SOURCE_ADDENDUM);
 
-Use ${mcqCount} MCQ questions and ${saCount} short-answer questions.
-
-Return this exact JSON structure:
-{
-  "questions": [
-    {
-      "id": "q1",
-      "type": "mcq",
-      "question": "Question text",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctIndex": 0
-    },
-    {
-      "id": "q2",
-      "type": "short_answer",
-      "question": "Question text",
-      "rubric": "A complete answer must include: [key points]. Common mistakes: [misconceptions to watch for]."
-    }
-  ]
-}`;
+    const userPrompt = [
+      hasSource
+        ? `STUDY MATERIAL FOR "${topic}":\n\n${contextText}\n\n---`
+        : null,
+      `Create ${count} quiz questions about "${topic}" at ${difficulty} difficulty.`,
+      `Use ${mcqCount} MCQ and ${saCount} short-answer questions.`,
+      ``,
+      `Return this exact JSON:`,
+      `{`,
+      `  "questions": [`,
+      `    {`,
+      `      "id": "q1",`,
+      `      "type": "mcq",`,
+      `      "question": "...",`,
+      `      "options": ["A", "B", "C", "D"],`,
+      `      "correctIndex": 0`,
+      `    },`,
+      `    {`,
+      `      "id": "q2",`,
+      `      "type": "short_answer",`,
+      `      "question": "...",`,
+      `      "rubric": "A complete answer must include: [key points]. Common mistakes: [misconceptions]."`,
+      `    }`,
+      `  ]`,
+      `}`,
+    ]
+      .filter(l => l !== null)
+      .join('\n');
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
@@ -59,7 +75,7 @@ Return this exact JSON structure:
       system: [
         {
           type: 'text',
-          text: SYSTEM_PROMPT,
+          text: systemPrompt,
           cache_control: { type: 'ephemeral' },
         },
       ],
@@ -73,8 +89,7 @@ Return this exact JSON structure:
 
     const text = content.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const parsed = JSON.parse(text);
-
-    return NextResponse.json(parsed);
+    return NextResponse.json({ ...parsed, hasSource });
   } catch (err) {
     console.error('Generate error:', err);
     return NextResponse.json({ error: 'Failed to generate questions' }, { status: 500 });
