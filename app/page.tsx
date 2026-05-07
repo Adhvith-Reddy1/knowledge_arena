@@ -55,7 +55,7 @@ export default function Home() {
 
   if (topics.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 text-center">
+      <div className="flex-1 flex flex-col items-center justify-center text-center">
         <div className="text-4xl mb-4">📚</div>
         <h1 className="text-xl font-bold text-gray-900 mb-2">No topics yet</h1>
         <p className="text-sm text-gray-500 mb-6">

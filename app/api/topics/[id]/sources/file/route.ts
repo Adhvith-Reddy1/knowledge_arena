@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSource } from '@/lib/db';
-import { parsePdf, parseText } from '@/lib/fileParser';
+import { parsePdf, parsePptx, parseText } from '@/lib/fileParser';
 import { randomUUID } from 'crypto';
 
 export async function POST(
@@ -24,11 +24,13 @@ export async function POST(
   try {
     if (ext === 'pdf') {
       text = await parsePdf(buffer);
+    } else if (['pptx', 'ppt'].includes(ext)) {
+      text = await parsePptx(buffer);
     } else if (['txt', 'md', 'markdown'].includes(ext)) {
       text = parseText(buffer);
     } else {
       return NextResponse.json(
-        { error: 'Unsupported file type. Use PDF, TXT, or MD.' },
+        { error: 'Unsupported file type. Use PDF, PPTX, PPT, TXT, or MD.' },
         { status: 400 }
       );
     }

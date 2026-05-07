@@ -233,7 +233,7 @@ export default function TopicPage() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.txt,.md,.markdown"
+            accept=".pdf,.pptx,.ppt,.txt,.md,.markdown"
             onChange={uploadFile}
             className="hidden"
             id="file-upload"
@@ -252,7 +252,7 @@ export default function TopicPage() {
             ) : (
               <>
                 <span>↑</span>
-                Upload PDF, TXT, or MD
+                Upload PDF, PPTX, TXT, or MD
               </>
             )}
           </label>

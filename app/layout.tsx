@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${geist.className} bg-gray-50 min-h-screen text-gray-900 antialiased`}>
+      <body className={`${geist.className} bg-gray-50 min-h-screen flex flex-col text-gray-900 antialiased`}>
         <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
           <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
             <Link href="/" className="font-bold text-gray-900 tracking-tight">
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </nav>
           </div>
         </header>
-        <main className="max-w-3xl mx-auto px-4 py-8">
+        <main className="max-w-3xl mx-auto w-full px-4 py-8 flex-1 flex flex-col">
           {children}
         </main>
       </body>
